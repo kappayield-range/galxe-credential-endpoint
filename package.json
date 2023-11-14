@@ -1,0 +1,20 @@
+{
+  "name": "galxe-credential-endpoint",
+  "version": "1.0.0",
+  "description": "",
+  "main": "nativeXrange-credential.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com-kappayield-range:kappayield-range/galxe-credential-endpoint.git"
+  },
+  "author": "kappayield",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.5.1",
+    "ethers": "^6.8.0",
+    "express": "^4.18.2"
+  }
+}
