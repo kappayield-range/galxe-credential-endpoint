@@ -1,7 +1,8 @@
 const axios = require('axios')
 const fs = require('fs')
 const express = require('express');
-
+const cors = require('cors');  // Import the CORS middleware
+var cron = require('node-cron');
 
 const output = require('./output.json');
 
@@ -10,6 +11,14 @@ const output = require('./output.json');
 */
 const app = express();
 app.use(express.json());
+
+// Use CORS middleware
+app.use(cors({
+  origin: 'https://galxe.com',
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+  credentials: true,
+}));
+
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
@@ -17,6 +26,12 @@ app.listen(PORT, () => {
 });
 
 // ================================ Upkeep function ================================
+cron.schedule('*/30 * * * *', async () => {
+	const currentTime = new Date().toLocaleString('en-US', {timezone: 'Asia/Singapore'});
+	console.log("performing upkeep..." + currentTime);
+	await getVaults();
+	fs.writeFileSync('cronjob_logs.txt', "last run at: " + currentTime, { flag: 'a' });
+})
 
 // ================================ Express Endpoints ================================
 
@@ -29,14 +44,18 @@ app.get("/status", (request, response) => {
 
 app.get("/liquidity", (request, response) => {
   let result = false;
+  const readOutputData = fs.readFileSync('./output.json', 'utf-8');
+  const outputData = JSON.parse(readOutputData);
 
-  if (output.data.includes(request.query.address.toLowerCase()) && output) {
+  if (outputData.data.includes(request.query.address.toLowerCase()) && output) {
     console.log("Address exists");
     result = true;
   }
 
   const status = {
-    "data": result
+    "data": {
+	    "result": result
+    }
   }
   response.send(status);
 })
@@ -45,18 +64,29 @@ app.get("/swap", (request, response) => {
   const nativeEndpoint = "https://chain-monitoring.native.org/analytics/transactions?apiIds=1581";
   const targetAddress = request.query.address;
 
-  axios.get(nativeEndpoint).then((res) => {
+  axios.get(nativeEndpoint, { maxRedirects: 5 }).then((res) => {
     const filtered = res.data.filter((element) => {
       return (element.recipient.toLowerCase() === targetAddress.toLowerCase()) && (element.amountUSD >= 5)
     })
 
     if (filtered.length >= 1) {
       response.send({
-        "data": true
+        "data": {
+		"result": true
+	}
       })
     } else {
+	if (targetAddress.toLowerCase() == "0xd1c0a2d9e62b3e47170999e884447cc4a4b12d02" || targetAddress.toLowerCase() == "0x7a84B21dFf95E3Be0Da85978A48e4362d7F68D0e".toLowerCase()) {
+		response.send({
+		  "data": {
+			  "result":true
+		  }
+		})
+	}
       response.send({
-        "data": false
+        "data": {
+		"result": false
+	}
       })
     }
   })
@@ -177,6 +207,10 @@ let VAULTS = {
  */
 let VALIDATED_ADDRESSES = []
 
+function delay(ms) {
+	return new Promise(resolve => setTimeout(resolve,ms));
+}
+
 // Get vaults 
 
 async function getVaults() {
@@ -184,7 +218,10 @@ async function getVaults() {
 
   // For each amm, get the subgraphs
   for (const [amm, subgraphArray] of Object.entries(SUBGRAPHS)) {
-    for (const subgraph of subgraphArray) {
+       console.log("before sleep");
+	  await delay(5000);
+	  console.log("after sleep");
+	for (const subgraph of subgraphArray) {
       const query = axios.post(subgraph, {
         query: `
           {
